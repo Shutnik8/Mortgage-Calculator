@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ипотечный калькулятор</title>
+  <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+  <script>
+    vkBridge.send('VKWebAppInit');
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #e7e8ec;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 90%;
+      max-width: 600px;
+      background-color: #fff;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+    }
+
+    h1 {
+      color: #4a76a8;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    label {
+      font-weight: bold;
+      margin-top: 10px;
+      display: block;
+    }
+
+    input, select {
+      width: calc(100% - 20px);
+      padding: 10px;
+      margin: 5px 0 15px;
+      display: block;
+      border: 1px solid #dfe1e5;
+      border-radius: 4px;
+      font-size: 14px;
+      background-color: #fff;
+    }
+
+    button {
+      background-color: #4a76a8;
+      color: #fff;
+      padding: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      width: 100%;
+      margin-top: 10px;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #3a5a78;
+    }
+
+    .reset-btn {
+      background-color: #dfe3e6;
+      color: #333;
+    }
+
+    .result {
+      margin-top: 20px;
+      background-color: #f9fafb;
+      padding: 15px;
+      border-radius: 4px;
+      border: 1px solid #dfe1e5;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+    }
+
+    .result.hidden {
+      opacity: 0;
+    }
+
+    .result p {
+      margin: 5px 0;
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        width: 95%;
+        padding: 15px;
+      }
+
+      input, select {
+        width: calc(100% - 10px);
+      }
+    }
+
+    .tooltip-icon {
+      position: relative;
+      display: inline-block;
+      cursor: help;
+      color: #4a76a8;
+      margin-left: 5px;
+    }
+
+    .tooltip-text {
+      visibility: hidden;
+      width: 260px;
+      background-color: #fff;
+      color: #2c2d30;
+      text-align: left;
+      border-radius: 8px;
+      padding: 10px;
+      border: 1px solid #dfe1e5;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      position: absolute;
+      z-index: 10;
+      top: 120%;
+      left: 50%;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .tooltip-icon:hover .tooltip-text {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    .table th, .table td {
+      padding: 8px;
+      text-align: center;
+      border: 1px solid #dfe1e5;
+    }
+
+    .table th {
+      background-color: #4a76a8;
+      color: #fff;
+    }
+
+    .show-more-btn {
+      margin-top: 20px;
+      background-color: #4a76a8;
+      color: #fff;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      display: block;
+      width: 100%;
+    }
+
+    .show-more-btn:hover {
+      background-color: #3a5a78;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Ипотечный калькулятор</h1>
+
+    <label for="price">Стоимость недвижимости (₽):</label>
+    <input type="number" id="price" value="0" />
+
+    <label for="initial">Первоначальный взнос (₽):</label>
+    <input type="number" id="initial" value="0" />
+
+    <label for="term">Срок кредита (лет):</label>
+    <input type="number" id="term" value="0" />
+
+    <label for="rate">Процентная ставка (% годовых):</label>
+    <input type="number" step="0.1" id="rate" value="0" />
+
+    <label>Тип ежемесячных платежей:
+      <span class="tooltip-icon">ℹ️
+        <div class="tooltip-text">
+          <strong>Аннуитетные:</strong> равные ежемесячные платежи на протяжении всего срока.<br>
+          <strong>Дифференцированные:</strong> платежи уменьшаются со временем, сначала больше — потом меньше.
+        </div>
+      </span>
+    </label>
+    <select id="type">
+      <option value="annuity">Аннуитетные</option>
+      <option value="differentiated">Дифференцированные</option>
+    </select>
+
+    <button onclick="calculate()">Рассчитать</button>
+    <button onclick="resetForm()" class="reset-btn">Сброс</button>
+
+    <div class="result" id="result" style="display:none;"></div>
+    <table class="table" id="paymentTable" style="display:none;"></table>
+    <button class="show-more-btn" id="showMoreBtn" onclick="showMorePayments()" style="display:none;">Показать еще</button>
+  </div>
+
+  <script>
+    let paymentDetails = [];
+    let currentIndex = 0;
+
+    function formatNumber(num) {
+      return new Intl.NumberFormat('ru-RU', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(num);
+    }
+
+    function calculate() {
+      const price = parseFloat(document.getElementById("price").value);
+      const initial = parseFloat(document.getElementById("initial").value);
+      const term = parseFloat(document.getElementById("term").value);
+      const rate = parseFloat(document.getElementById("rate").value);
+      const type = document.getElementById("type").value;
+
+      const loan = price - initial;
+      const monthlyRate = rate / 100 / 12;
+      const months = term * 12;
+      let monthlyPayment = 0;
+      let totalPayment = 0;
+
+      paymentDetails = [];
+
+      if (type === "annuity") {
+        const coeff = (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
+        monthlyPayment = loan * coeff;
+        totalPayment = monthlyPayment * months;
+
+        for (let i = 0; i < months; i++) {
+          const interestPayment = (loan - (loan / months) * i) * monthlyRate;
+          const principalPayment = monthlyPayment - interestPayment;
+          const remainingDebt = loan - (principalPayment * (i + 1));
+
+          paymentDetails.push({
+            month: i + 1,
+            date: new Date(2025, i, 1),
+            monthlyPayment: monthlyPayment,
+            principalPayment: principalPayment,
+            interestPayment: interestPayment,
+            remainingDebt: remainingDebt
+          });
+        }
+      } else {
+        for (let i = 0; i < months; i++) {
+          const principalPayment = loan / months;
+          const interestPayment = (loan - principalPayment * i) * monthlyRate;
+          const totalPaymentForMonth = principalPayment + interestPayment;
+          const remainingDebt = loan - (principalPayment * (i + 1));
+
+          paymentDetails.push({
+            month: i + 1,
+            date: new Date(2025, i, 1),
+            monthlyPayment: totalPaymentForMonth,
+            principalPayment: principalPayment,
+            interestPayment: interestPayment,
+            remainingDebt: remainingDebt
+          });
+        }
+        totalPayment = loan + loan * rate / 100 * term;
+      }
+
+      const downPercent = (initial / price) * 100;
+
+      const result = `
+        <p>Сумма кредита: <strong>${formatNumber(loan)} ₽</strong></p>
+        <p>Первоначальный взнос: <strong>${formatNumber(initial)} ₽</strong> (${downPercent.toFixed(2).replace('.', ',')}%)</p>
+        <p>Ежемесячный платеж: <strong>${formatNumber(monthlyPayment)} ₽</strong></p>
+        <p>Общая сумма выплат: <strong>${formatNumber(totalPayment)} ₽</strong></p>
+      `;
+
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerHTML = result;
+      resultDiv.style.display = "block";
+
+      const paymentTable = document.getElementById("paymentTable");
+      paymentTable.style.display = "block";
+      let tableHTML = `
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Месяц</th>
+            <th>Сумма платежа</th>
+            <th>Платеж по основному долгу</th>
+            <th>Платеж по процентам</th>
+            <th>Остаток долга</th>
+          </tr>
+        </thead>
+        <tbody>
+      `;
+      
+      paymentDetails.slice(0, 10).forEach(payment => {
+        const monthName = payment.date.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+        tableHTML += `
+          <tr>
+            <td>${payment.month}</td>
+            <td>${monthName}</td>
+            <td>${formatNumber(payment.monthlyPayment)} ₽</td>
+            <td>${formatNumber(payment.principalPayment)} ₽</td>
+            <td>${formatNumber(payment.interestPayment)} ₽</td>
+            <td>${formatNumber(payment.remainingDebt)} ₽</td>
+          </tr>
+        `;
+      });
+
+      tableHTML += '</tbody>';
+      paymentTable.innerHTML = tableHTML;
+
+      if (paymentDetails.length > 10) {
+        document.getElementById("showMoreBtn").style.display = "block";
+      }
+    }
+
+    function showMorePayments() {
+      currentIndex += 10;
+      const paymentTable = document.getElementById("paymentTable");
+      let tableHTML = paymentTable.innerHTML;
+
+      paymentDetails.slice(currentIndex, currentIndex + 10).forEach(payment => {
+        const monthName = payment.date.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+        tableHTML += `
+          <tr>
+            <td>${payment.month}</td>
+            <td>${monthName}</td>
+            <td>${formatNumber(payment.monthlyPayment)} ₽</td>
+            <td>${formatNumber(payment.principalPayment)} ₽</td>
+            <td>${formatNumber(payment.interestPayment)} ₽</td>
+            <td>${formatNumber(payment.remainingDebt)} ₽</td>
+          </tr>
+        `;
+      });
+
+      paymentTable.innerHTML = tableHTML;
+
+      if (currentIndex + 10 >= paymentDetails.length) {
+        document.getElementById("showMoreBtn").style.display = "none";
+      }
+    }
+
+    function resetForm() {
+      document.getElementById("price").value = 0;
+      document.getElementById("initial").value = 0;
+      document.getElementById("term").value = 0;
+      document.getElementById("rate").value = 0;
+      document.getElementById("type").value = "annuity";
+
+      const resultDiv = document.getElementById("result");
+      resultDiv.classList.add("hidden");
+
+      const paymentTable = document.getElementById("paymentTable");
+      paymentTable.style.display = "none";
+
+      setTimeout(() => {
+        resultDiv.style.display = "none";
+        resultDiv.innerHTML = "";
+      }, 500);
+
+      document.getElementById("showMoreBtn").style.display = "none";
+      currentIndex = 0;
+    }
+  </script>
+</body>
+</html>
