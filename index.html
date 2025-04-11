@@ -14,10 +14,49 @@
       background-color: #e7e8ec;
       margin: 0;
       padding: 0;
+      min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
+    }
+
+    .intro {
+      text-align: center;
+      padding: 40px 20px;
+      opacity: 0;
+      animation: fadeIn 1.2s ease-in-out forwards;
+    }
+
+    .intro h2 span {
+      color: #4a76a8;
+    }
+
+    .intro button {
+      margin-top: 20px;
+      padding: 14px 30px;
+      font-size: 16px;
+      background-color: #4a76a8;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .intro button:hover {
+      background-color: #3a5a78;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .container {
@@ -173,7 +212,16 @@
   </style>
 </head>
 <body>
-  <div class="container">
+
+  <!-- Intro-блок -->
+  <div id="intro" class="intro">
+    <h2>Добро пожаловать в<br><span>Ипотечный калькулятор</span></h2>
+    <p>Быстрый расчёт ежемесячных платежей и полной стоимости ипотеки</p>
+    <button onclick="startApp()">Начать расчёт</button>
+  </div>
+
+  <!-- Калькулятор -->
+  <div class="container" id="mainApp" style="display: none;">
     <h1>Ипотечный калькулятор</h1>
 
     <label for="price">Стоимость недвижимости (₽):</label>
@@ -213,6 +261,11 @@
     let paymentDetails = [];
     let currentIndex = 0;
 
+    function startApp() {
+      document.getElementById("intro").style.display = "none";
+      document.getElementById("mainApp").style.display = "block";
+    }
+
     function formatNumber(num) {
       return new Intl.NumberFormat('ru-RU', {
         minimumFractionDigits: 2,
@@ -226,6 +279,11 @@
       const term = parseFloat(document.getElementById("term").value);
       const rate = parseFloat(document.getElementById("rate").value);
       const type = document.getElementById("type").value;
+
+      if (isNaN(price) || isNaN(initial) || isNaN(term) || isNaN(rate)) {
+        alert("Пожалуйста, заполните все поля числовыми значениями.");
+        return;
+      }
 
       const loan = price - initial;
       const monthlyRate = rate / 100 / 12;
@@ -254,33 +312,60 @@
             remainingDebt: remainingDebt
           });
         }
-      } else {
-        for (let i = 0; i < months; i++) {
-          const principalPayment = loan / months;
-          const interestPayment = (loan - principalPayment * i) * monthlyRate;
-          const totalPaymentForMonth = principalPayment + interestPayment;
-          const remainingDebt = loan - (principalPayment * (i + 1));
+     } else { // Дифференцированные платежи
+  let totalInterestPaid = 0; // Общие проценты, уплаченные за весь период
+  for (let i = 0; i < months; i++) {
+    // Платеж по основному долгу (фиксированное значение)
+    const principalPayment = loan / months;
+    
+    // Процентный платеж на оставшийся долг
+    const interestPayment = (loan - principalPayment * i) * monthlyRate;
+    
+    // Общий платеж за месяц (основной долг + проценты)
+    const totalPaymentForMonth = principalPayment + interestPayment;
+    
+    // Обновляем общую сумму процентов, уплаченных за весь период
+    totalInterestPaid += interestPayment;
+    
+    // Оставшийся долг
+    const remainingDebt = loan - (principalPayment * (i + 1));
 
-          paymentDetails.push({
-            month: i + 1,
-            date: new Date(2025, i, 1),
-            monthlyPayment: totalPaymentForMonth,
-            principalPayment: principalPayment,
-            interestPayment: interestPayment,
-            remainingDebt: remainingDebt
-          });
-        }
-        totalPayment = loan + loan * rate / 100 * term;
-      }
+    paymentDetails.push({
+      month: i + 1,
+      date: new Date(2025, i, 1),
+      monthlyPayment: totalPaymentForMonth, // Сумма платежа на этот месяц
+      principalPayment: principalPayment,
+      interestPayment: interestPayment,
+      remainingDebt: remainingDebt
+    });
+  }
 
-      const downPercent = (initial / price) * 100;
+  // Общая сумма выплат для дифференцированных платежей: сумма основного долга + проценты за весь период
+  totalPayment = loan + totalInterestPaid;
+}
 
-      const result = `
-        <p>Сумма кредита: <strong>${formatNumber(loan)} ₽</strong></p>
-        <p>Первоначальный взнос: <strong>${formatNumber(initial)} ₽</strong> (${downPercent.toFixed(2).replace('.', ',')}%)</p>
-        <p>Ежемесячный платеж: <strong>${formatNumber(monthlyPayment)} ₽</strong></p>
-        <p>Общая сумма выплат: <strong>${formatNumber(totalPayment)} ₽</strong></p>
-      `;
+
+
+      const downPercent = (price === 0 || initial === 0) ? 0 : (initial / price) * 100;
+
+
+      let paymentInfo = "";
+
+if (type === "annuity") {
+  paymentInfo = `<p>Ежемесячный платеж: <strong>${formatNumber(monthlyPayment)} ₽</strong></p>`;
+} else {
+  const firstPayment = paymentDetails[0]?.monthlyPayment || 0;
+  const lastPayment = paymentDetails[paymentDetails.length - 1]?.monthlyPayment || 0;
+  paymentInfo = `<p>Ежемесячный платеж: <strong>${formatNumber(firstPayment)} ₽ - ${formatNumber(lastPayment)} ₽</strong></p>`;
+}
+
+const result = `
+  <p>Сумма кредита: <strong>${formatNumber(loan)} ₽</strong></p>
+  <p>Первоначальный взнос: <strong>${formatNumber(initial)} ₽</strong> (${downPercent.toFixed(2).replace('.', ',')}%)</p>
+  ${paymentInfo}
+  <p>Общая сумма выплат: <strong>${formatNumber(totalPayment)} ₽</strong></p>
+`;
+
 
       const resultDiv = document.getElementById("result");
       resultDiv.innerHTML = result;
@@ -355,21 +440,10 @@
       document.getElementById("initial").value = 0;
       document.getElementById("term").value = 0;
       document.getElementById("rate").value = 0;
-      document.getElementById("type").value = "annuity";
-
-      const resultDiv = document.getElementById("result");
-      resultDiv.classList.add("hidden");
-
-      const paymentTable = document.getElementById("paymentTable");
-      paymentTable.style.display = "none";
-
-      setTimeout(() => {
-        resultDiv.style.display = "none";
-        resultDiv.innerHTML = "";
-      }, 500);
-
+      document.getElementById("type").value = 'annuity';
+      document.getElementById("result").style.display = "none";
+      document.getElementById("paymentTable").style.display = "none";
       document.getElementById("showMoreBtn").style.display = "none";
-      currentIndex = 0;
     }
   </script>
 </body>
